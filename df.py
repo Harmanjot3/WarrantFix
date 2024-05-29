@@ -9,27 +9,14 @@ import mysql.connector
 import schedule
 import time
 from twilio.rest import Client
-from datetime import datetime, date
-from dateutil.relativedelta import relativedelta
-import threading
+from datetime import datetime
 
-
-# Function to set warranty reminders for a user
-# Twilio credentials (replace with your own values)
-TWILIO_ACCOUNT_SID = "AC51802bca71499b6da25284cf0471f8ef"
-TWILIO_AUTH_TOKEN = "57de58d69e299a2151ac4144c646b6f4"
-TWILIO_PHONE_NUMBER = "+13343842190"
-twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-
-def run_scheduler():
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
-
+# Function to send an SMS using Twilio
 def send_twilio_sms(body, to_phone_number):
+    client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
     try:
-        message = twilio_client.messages.create(
+        message = client.messages.create(
             body=body,
             from_=TWILIO_PHONE_NUMBER,
             to=to_phone_number
@@ -38,73 +25,32 @@ def send_twilio_sms(body, to_phone_number):
     except Exception as e:
         print(f"Twilio SMS sending failed: {str(e)}")
 
+# Function to set warranty reminders for a user
+# Twilio credentials (replace with your own values)
+TWILIO_ACCOUNT_SID = "AC51802bca71499b6da25284cf0471f8ef"
+TWILIO_AUTH_TOKEN = "57de58d69e299a2151ac4144c646b6f4"
+TWILIO_PHONE_NUMBER = "+1234567890"  # Replace with y
+twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+def set_warranty_reminders(user_id):
+    # Fetch user's phone number from the database
+    select_user_query = "SELECT phone_number FROM users WHERE id = %s"
+    cursor.execute(select_user_query, (user_id,))
+    user_data = cursor.fetchone()
+    if user_data:
+        user_phone_number = user_data[0]
+    else:
+        print("User not found in the database.")
+        return
 
-def set_warranty_reminders(conn, user_id):
-    try:
-        with conn.cursor() as cursor:
-            # Fetch user's phone number
-            cursor.execute("SELECT phone_number FROM users WHERE id = %s", (user_id,))
-            user_data = cursor.fetchone()
-            if not user_data:
-                print("User not found in the database.")
-                return
+    # Set warranty reminders (adjust the scheduling time and message as needed)
+    schedule.every().day.at("14:00").do(
+        send_twilio_sms, "Warranty Reminder: Check your warranty.", user_phone_number
+    )
 
-            user_phone_number = user_data[0]
-
-            # Ask user for the interval
-            try:
-                interval_days = int(input("Enter the interval (in days) for warranty reminders: "))
-            except ValueError:
-                print("Invalid input. Please enter a number.")
-                return
-
-            # Fetch product details from both offline and online product tables
-            cursor.execute("""
-                SELECT product_name, purchase_date, warranty_period
-                FROM offline_product_registrations
-                WHERE user_id = %s
-                UNION
-                SELECT product_name, purchase_date, warranty_period
-                FROM online_product_registrations
-                WHERE user_id = %s
-            """, (user_id, user_id))
-            products = cursor.fetchall()
-
-            for product in products:
-                product_name, purchase_date, warranty_period = product
-
-                # Check if purchase_date is a string and convert it to a date object if necessary
-                if isinstance(purchase_date, str):
-                    purchase_date = datetime.strptime(purchase_date, "%Y-%m-%d").date()
-                elif not isinstance(purchase_date, date):
-                    print(f"Invalid date format for product {product_name}")
-                    continue
-
-                # Calculate warranty expiry date
-                warranty_expiry_date = purchase_date + relativedelta(months=warranty_period)
-                expiry_date_str = warranty_expiry_date.strftime("%Y-%m-%d")
-
-                # Send acknowledgment message for each product
-                ack_message = (f"Reminder set for {product_name}. Warranty valid until {expiry_date_str}. "
-                               f"Next reminder in {interval_days} days.")
-                send_twilio_sms(ack_message, user_phone_number)
-
-                # Schedule the warranty reminders for each product
-                schedule.every(interval_days).days.do(
-                    send_twilio_sms, f"Warranty Reminder for {product_name}: Check your warranty.", user_phone_number
-                )
-                scheduler_thread = threading.Thread(target=run_scheduler)
-                scheduler_thread.daemon = True  # Makes the thread exit when the main program exits
-                scheduler_thread.start()
-
-                print("Warranty reminders have been set.")
-
-            else:
-                print(".")
-
-    except mysql.connector.Error as err:
-        print(f"Database error: {err}")
-
+    # Keep running the scheduler
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 # Function to display loading animation
 def loading_animation():
     for _ in range(10):
@@ -262,7 +208,7 @@ def display_registered_products(user_id):
     print("Registered Products:")
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT product_name, purchase_date, warranty_code, source_url FROM online_product_registrations WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT product_name, seller, purchase_date, warranty_code FROM online_product_registrations WHERE user_id = %s", (user_id,))
             online_products = cursor.fetchall()
             print("Online Products:")
             for product in online_products:
@@ -331,7 +277,7 @@ def user_menu(user_id):
         elif choice == "2":
             register_offline_product(user_id)
         elif choice == "3":
-            set_warranty_reminders(conn,user_id)
+            set_warranty_reminders(user_id)
         elif choice == "4":
             display_registered_products(user_id)
         elif choice == "5":

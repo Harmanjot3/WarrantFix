@@ -14,11 +14,13 @@ from dateutil.relativedelta import relativedelta
 import threading
 
 
+
+
 # Function to set warranty reminders for a user
 # Twilio credentials (replace with your own values)
 TWILIO_ACCOUNT_SID = "AC51802bca71499b6da25284cf0471f8ef"
 TWILIO_AUTH_TOKEN = "57de58d69e299a2151ac4144c646b6f4"
-TWILIO_PHONE_NUMBER = "+13343842190"
+TWILIO_PHONE_NUMBER = "+13343842190"  # Replace with y
 twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 def run_scheduler():

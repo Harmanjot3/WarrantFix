@@ -1,0 +1,165 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def rastrigin(x):
+    return 10 * len(x) + np.sum(x ** 2 - 10 * np.cos(2 * np.pi * x))
+
+
+def sphere(x):
+    return np.sum(x ** 2)
+
+
+def rosenbrock(x):
+    return np.sum(100 * (x[1:] - x[:-1] ** 2) ** 2 + (1 - x[:-1]) ** 2)
+
+
+def griewank(x):
+    return 1 + np.sum(x ** 2) / 4000 - np.prod(np.cos(x / np.sqrt(np.arange(1, len(x) + 1))))
+
+
+def ackley(x):
+    return -20 * np.exp(-0.2 * np.sqrt(np.sum(x ** 2) / len(x))) - np.exp(
+        np.sum(np.cos(2 * np.pi * x)) / len(x)) + 20 + np.exp(1)
+
+
+def Get_F_details(F):
+    if F == 'rastrigin':
+        return rastrigin, 30, -5.12, 5.12
+    elif F == 'sphere':
+        return sphere, 3, -10, 10
+    elif F == 'rosenbrock':
+        return rosenbrock, 30, -5, 10
+    elif F == 'griewank':
+        return griewank, 30, -600, 600
+    elif F == 'ackley':
+        return ackley, 30, -32.768, 32.768
+    else:
+        raise ValueError("Invalid function name")
+
+
+def VPPSO(Function_name, max_iteration):
+    fobj, dim, lb, ub = Get_F_details(Function_name)
+
+    N = 15
+    NT = N + 15
+
+    w_Max = 0.9
+    w_Min = 0.1
+
+    c1 = 2
+    c2 = 2
+
+    X_min = lb * np.ones(dim)
+    X_max = ub * np.ones(dim)
+    V_max = 0.1 * (ub - lb) * np.ones(dim)
+    V_min = -V_max
+
+    gbest_fitness = np.inf
+
+    Position = np.zeros((NT, dim))
+    Velocity = np.zeros((NT, dim))
+    fitness = np.zeros(NT)
+    Pbest = np.zeros((NT, dim))
+    Pbest_finess = np.zeros(NT)
+
+    for i in range(N):
+        Position[i, :] = X_min + (X_max - X_min) * np.random.rand(dim)
+        Velocity[i, :] = np.zeros(dim)
+
+        fitness[i] = fobj(Position[i, :])
+        Pbest[i, :] = Position[i, :]
+        Pbest_finess[i] = fitness[i]
+
+        if Pbest_finess[i] < gbest_fitness:
+            gbest = Pbest[i, :]
+            gbest_fitness = Pbest_finess[i]
+
+    Fitness_Curve = np.zeros(max_iteration)
+
+    for t in range(max_iteration):
+        ww = np.exp(-(2.5 * t / max_iteration) ** 2.5)
+
+        for i in range(N):
+            if np.random.rand() < 0.3:
+                Velocity[i, :] = np.abs(Velocity[i, :]) ** (np.random.rand() * ww) + \
+                                 np.random.rand() * c1 * (Pbest[i, :] - Position[i, :]) + \
+                                 np.random.rand() * c2 * (gbest - Position[i, :])
+
+                # Velocity clamping
+                Velocity[i, :] = np.maximum(np.minimum(Velocity[i, :], V_max), V_min)
+
+            Position[i, :] = Position[i, :] + Velocity[i, :]
+
+            # Apply boundary constraints
+            Position[i, :] = np.maximum(np.minimum(Position[i, :], ub), lb)
+
+        for i in range(N, NT):
+            for j in range(dim):
+                CC = ww * np.random.rand() * np.abs(gbest[j]) ** ww
+
+                if np.random.rand() < 0.5:
+                    Position[i, j] = gbest[j] + CC
+                else:
+                    Position[i, j] = gbest[j] - CC
+
+            # Apply boundary constraints
+            Position[i, :] = np.maximum(np.minimum(Position[i, :], ub), lb)
+
+            # Update fitness
+            fitness[i] = fobj(Position[i, :])
+
+            if i < N:
+                if fitness[i] < Pbest_finess[i]:
+                    Pbest[i, :] = Position[i, :]
+                    Pbest_finess[i] = fitness[i]
+
+                    if Pbest_finess[i] < gbest_fitness:
+                        gbest = Pbest[i, :]
+                        gbest_fitness = Pbest_finess[i]
+            else:
+                if fitness[i] < gbest_fitness:
+                    gbest = Position[i, :]
+                    gbest_fitness = fitness[i]
+
+        Fitness_Curve[t] = gbest_fitness
+
+    return gbest_fitness, gbest, Fitness_Curve
+
+
+# Menu for function selection
+while True:
+    print("Select a function:")
+    print("1. Rastrigin")
+    print("2. Sphere")
+    print("3. Rosenbrock")
+    print("4. Griewank")
+    print("5. Ackley")
+    print("6. Exit")
+
+    choice = int(input("Enter the number corresponding to the function (or 6 to exit): "))
+
+    if choice == 6:
+        print("Exiting...")
+        break
+
+    if choice >= 1 and choice <= 5:
+        function_names = ['rastrigin', 'sphere', 'rosenbrock', 'griewank', 'ackley']
+        selected_function = function_names[choice - 1]
+
+        np.random.seed(42)
+
+        Function_name = selected_function
+        max_iteration = 100
+        gbest_fitness, gbest, Fitness_Curve = VPPSO(Function_name, max_iteration)
+
+        print("Final gbest_fitness:", gbest_fitness)
+        print("Final gbest:", gbest)
+
+        plt.plot(Fitness_Curve)
+        plt.title('Convergence curve')
+        plt.xlabel('Iteration')
+        plt.ylabel('Best Fitness')
+        plt.show()
+    else:
+        print("Invalid choice. Please select a valid option.")
