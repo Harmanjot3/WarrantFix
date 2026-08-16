@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+mysql-connector-python
+bcrypt
+pyjwt
+twilio
+python-dotenv
+apscheduler
